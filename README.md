@@ -43,4 +43,4 @@ report要求包含：该次report的git commit 编号，相关实现细节与效
 
 # RayTracer更新
 
-[教程](https://raytracing.github.io/)
+[教程](https://raytracing.github.io/)# RayTracer
