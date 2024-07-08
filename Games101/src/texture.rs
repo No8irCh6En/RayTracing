@@ -1,5 +1,5 @@
 #![allow(warnings)]
-use nalgebra::{Vector3};
+use nalgebra::Vector3;
 
 use opencv::core::{MatTraitConst, VecN};
 use opencv::imgcodecs::{imread, IMREAD_COLOR};
@@ -23,11 +23,8 @@ impl Texture {
     }
 
     pub fn get_color(&self, mut u: f64, mut v: f64) -> Vector3<f64> {
-        if u < 0.0 { u = 0.0; }
-        if u > 1.0 { u = 1.0; }
-        if v < 0.0 { v = 0.0; }
-        if v > 1.0 { v = 1.0; }
-
+        u = u.max(0.0).min(1.0);
+        v = v.max(0.0).min(1.0);
         let u_img = u * self.width as f64;
         let v_img = (1.0 - v) * self.height as f64;
         let color: &VecN<u8, 3> = self.img_data.at_2d(v_img as i32, u_img as i32).unwrap();
@@ -37,7 +34,35 @@ impl Texture {
 
     pub fn get_color_bilinear(&self, mut u: f64, mut v: f64) -> Vector3<f64> {
         // 在此实现双线性插值函数, 并替换掉get_color
+        u = u.max(0.0).min(1.0);
+        v = v.max(0.0).min(1.0);
+        let u_img = u * self.width as f64;
+        let v_img = (1.0 - v) * self.height as f64;
+        let color00: &VecN<u8, 3> = self.img_data.at_2d(v_img as i32, u_img as i32).unwrap();
+        let color01: &VecN<u8, 3> = self.img_data.at_2d(v_img as i32 + 1, u_img as i32).unwrap();
+        let color10: &VecN<u8, 3> = self.img_data.at_2d(v_img as i32, u_img as i32 + 1).unwrap();
+        let color11: &VecN<u8, 3> = self
+            .img_data
+            .at_2d(v_img as i32 + 1, u_img as i32 + 1)
+            .unwrap();
 
-        Vector3::new(0.0, 0.0, 0.0)
+        let ratio1 = u_img - (u_img as i32) as f64;
+        let ratio2 = v_img - (v_img as i32) as f64;
+        let color_0 = Vector3::new(
+            color00[0] as f64 * ratio1 + color10[0] as f64 * (1.0 - ratio1),
+            color00[1] as f64 * ratio1 + color10[1] as f64 * (1.0 - ratio1),
+            color00[2] as f64 * ratio1 + color10[2] as f64 * (1.0 - ratio1),
+        );
+        let color_1 = Vector3::new(
+            color01[0] as f64 * ratio1 + color11[0] as f64 * (1.0 - ratio1),
+            color01[1] as f64 * ratio1 + color11[1] as f64 * (1.0 - ratio1),
+            color01[2] as f64 * ratio1 + color11[2] as f64 * (1.0 - ratio1),
+        );
+        let color = Vector3::new(
+            color_0[0] as f64 * ratio2 + color_1[0] as f64 * (1.0 - ratio2),
+            color_0[1] as f64 * ratio2 + color_1[1] as f64 * (1.0 - ratio2),
+            color_0[2] as f64 * ratio2 + color_1[2] as f64 * (1.0 - ratio2),
+        );
+        Vector3::new(color[2], color[1], color[0])
     }
 }
