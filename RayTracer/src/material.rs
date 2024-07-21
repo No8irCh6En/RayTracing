@@ -1,5 +1,8 @@
+use std::sync::Arc;
+
 use crate::hit::HitRecord;
 use crate::ray::Ray;
+use crate::texture::{CheckerTexture, SolidColor, Texture};
 use crate::vec3::Vec3;
 use rand::Rng;
 pub trait Material {
@@ -10,16 +13,23 @@ pub trait Material {
         attenuation: &mut Vec3,
         scattered: &mut Ray,
     ) -> bool;
+    fn emitted(&self, u: f64, v: f64, p: Vec3) -> Vec3;
 }
 
-#[derive(Clone, Debug, PartialEq, Copy)]
+#[derive(Clone)]
 pub struct Lambertian {
-    pub albedo: Vec3,
+    pub tex: Arc<dyn Texture>,
 }
 
 impl Lambertian {
     pub fn new(albedo: Vec3) -> Self {
-        Self { albedo }
+        Self {
+            tex: Arc::new(SolidColor::new(albedo)),
+        }
+    }
+
+    pub fn new_by_tex(tex: Arc<dyn Texture>) -> Self {
+        Self { tex }
     }
 }
 
@@ -31,14 +41,17 @@ impl Material for Lambertian {
         attenuation: &mut Vec3,
         scattered: &mut Ray,
     ) -> bool {
-        scattered.orig = rec.point;
         let mut dir = rec.normal + Vec3::random_unit_vector();
         if dir.near_zero() {
             dir = rec.normal;
         }
-        scattered.dir = dir;
-        *attenuation = self.albedo;
+        *scattered = Ray::new(rec.point, dir, ray_in.time);
+        *attenuation = self.tex.value(rec.u, rec.v, rec.point);
         true
+    }
+
+    fn emitted(&self, u: f64, v: f64, p: Vec3) -> Vec3 {
+        Vec3::zero()
     }
 }
 
@@ -67,10 +80,12 @@ impl Material for Metal {
     ) -> bool {
         let reflected = Vec3::reflect(ray_in.dir, rec.normal).normalize()
             + self.fuzz * Vec3::random_unit_vector();
-        scattered.orig = rec.point;
-        scattered.dir = reflected;
+        *scattered = Ray::new(rec.point, reflected, ray_in.time);
         *attenuation = self.albedo;
         scattered.dir * rec.normal > 0.0
+    }
+    fn emitted(&self, u: f64, v: f64, p: Vec3) -> Vec3 {
+        Vec3::zero()
     }
 }
 
@@ -87,7 +102,6 @@ impl Dielectric {
         r0 = r0 * r0;
         r0 + (1.0 - r0) * (1.0 - cosine).powi(5)
     }
-
 }
 
 impl Material for Dielectric {
@@ -111,12 +125,44 @@ impl Material for Dielectric {
         let cannot_refract = ri * sin_theta > 1.0;
         if cannot_refract || Dielectric::reflectance(cos_theta, ri) > rng.gen_range(0.0..1.0) {
             let reflected = Vec3::reflect(unit_dir, rec.normal);
-            scattered.dir = reflected;
+            *scattered = Ray::new(rec.point, reflected, ray_in.time);
         } else {
             let refracted = Vec3::refract(unit_dir, rec.normal, ri);
-            scattered.dir = refracted;
+            *scattered = Ray::new(rec.point, refracted, ray_in.time);
         }
-        scattered.orig = rec.point;
         true
+    }
+    fn emitted(&self, u: f64, v: f64, p: Vec3) -> Vec3 {
+        Vec3::zero()
+    }
+}
+
+pub struct DiffuseLight {
+    tex: Arc<dyn Texture>,
+}
+
+impl DiffuseLight {
+    pub fn new(tex: Arc<dyn Texture>) -> Self {
+        Self { tex }
+    }
+    pub fn new_by_color(emit: Vec3) -> Self {
+        Self {
+            tex: Arc::new(SolidColor::new(emit)),
+        }
+    }
+}
+
+impl Material for DiffuseLight {
+    fn scatter(
+        &self,
+        _ray_in: &Ray,
+        _rec: &HitRecord,
+        _attenuation: &mut Vec3,
+        _scattered: &mut Ray,
+    ) -> bool {
+        false
+    }
+    fn emitted(&self, u: f64, v: f64, p: Vec3) -> Vec3 {
+        self.tex.value(u, v, p)
     }
 }

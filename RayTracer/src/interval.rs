@@ -39,4 +39,28 @@ impl Interval {
         }
         x
     }
+
+    pub fn expand(&self, delta: f64) -> Interval {
+        Interval {
+            min: self.min - delta * 0.5,
+            max: self.max + delta * 0.5,
+        }
+    }
+
+    pub fn new_by_interval(a: Interval, b: Interval) -> Self {
+        Self {
+            min: a.min.min(b.min),
+            max: a.max.max(b.max),
+        }
+    }
+
+    pub fn size(&self) -> f64 {
+        self.max - self.min
+    }
+}
+
+impl Default for Interval {
+    fn default() -> Self {
+        Interval::universe()
+    }
 }

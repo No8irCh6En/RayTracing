@@ -2,7 +2,7 @@
 use crate::shader::{FragmentShaderPayload, VertexShaderPayload};
 use crate::texture::Texture;
 use crate::triangle::Triangle;
-use nalgebra::{Matrix3, Matrix4, Vector, Vector3, Vector4};
+use nalgebra::{ComplexField, Matrix3, Matrix4, Vector, Vector3, Vector4};
 use opencv::core::{sqrt, Mat, MatTraitConst};
 use opencv::imgproc::{cvt_color, COLOR_RGB2BGR};
 // use std::intrinsics::sqrtf64;
@@ -123,26 +123,62 @@ pub fn load_triangles(obj_file: &str) -> Vec<Triangle> {
     let (models, _) = tobj::load_obj(&obj_file, &tobj::LoadOptions::default()).unwrap();
     let mesh = &models[0].mesh;
     let n = mesh.indices.len() / 3;
+    println!("{}", n);
+    let n2 = mesh.positions.len() / 3;
+    println!("{}", n2);
+    let n3 = mesh.normals.len() / 3;
+    println!("{}", n3);
+    let n4 = mesh.texcoords.len() / 2;
+    println!("{}", n4);
     let mut triangles = vec![Triangle::default(); n];
 
     // 遍历模型的每个面
+    // for vtx in 0..176133.min(n) {
     for vtx in 0..n {
         let rg = vtx * 3..vtx * 3 + 3;
         let idx: Vec<_> = mesh.indices[rg.clone()]
             .iter()
             .map(|i| *i as usize)
             .collect();
-
         // 记录图形每个面中连续三个顶点（小三角形）
+        // if idx[0] != 3 * vtx {
+        //     println!("HS,{vtx},LL{}", idx[0]);
+        // }
         for j in 0..3 {
             let v = &mesh.positions[3 * idx[j]..3 * idx[j] + 3];
+            if vtx == 0 {
+                println!("{},{},{}", v[0], v[1], v[2]);
+            }
             triangles[vtx].set_vertex(j, Vector4::new(v[0] as f64, v[1] as f64, v[2] as f64, 1.0));
             let ns = &mesh.normals[3 * idx[j]..3 * idx[j] + 3];
+            // println!("{},{}", ns[0], ns[1]);
+            if vtx == 0 {
+                println!("{},{}", ns[0], ns[1]);
+            }
             triangles[vtx].set_normal(j, Vector3::new(ns[0] as f64, ns[1] as f64, ns[2] as f64));
+
             let tex = &mesh.texcoords[2 * idx[j]..2 * idx[j] + 2];
-            triangles[vtx].set_tex_coord(j, tex[0] as f64, tex[1] as f64);
+            if vtx == 0 {
+                println!("{},{}", tex[0], tex[1]);
+            }
+            // if (v[1] - 10.0).abs() < 0.5 || (v[0] - 10.0).abs() < 0.5 {
+            //     triangles[vtx].set_tex_coord(
+            //         j,
+            //         tex[0] as f64 - tex[0].floor() as f64,
+            //         tex[1] as f64 - tex[1].floor() as f64,
+            //     );
+            // } else {
+            //     triangles[vtx].set_tex_coord(j, 0.00001, 0.00001);
+            // }
+            triangles[vtx].set_tex_coord(
+                j,
+                tex[0] as f64 - tex[0].floor() as f64,
+                tex[1] as f64 - tex[1].floor() as f64,
+            );
+            // triangles[vtx].set_tex_coord(j, 0.25, 0.25);
         }
     }
+
     triangles
 }
 
@@ -184,7 +220,8 @@ struct Light {
 }
 
 pub fn normal_fragment_shader(payload: &FragmentShaderPayload) -> V3f {
-    let result_color = (payload.normal.xyz().normalize() + Vector3::new(1.0, 1.0, 1.0)) / 2.0;
+    // let result_color = (payload.normal.xyz().normalize() + Vector3::new(1.0, 1.0, 1.0)) / 2.0;
+    let result_color = Vector3::new(1.0, 0.6, 0.6);
     // println!("{}", result_color*255.0);
     result_color * 255.0
 }
@@ -197,16 +234,17 @@ pub fn phong_fragment_shader(payload: &FragmentShaderPayload) -> V3f {
 
     // 灯光位置和强度
     let l1 = Light {
-        position: Vector3::new(20.0, 20.0, 20.0),
+        position: Vector3::new(0.0, 0.0, 20.0),
         intensity: Vector3::new(500.0, 500.0, 500.0),
     };
     let l2 = Light {
-        position: Vector3::new(-20.0, 20.0, 0.0),
+        position: Vector3::new(0.0, 0.0, -20.0),
         intensity: Vector3::new(500.0, 500.0, 500.0),
     };
     let lights = vec![l1, l2];
-    let amb_light_intensity = Vector3::new(10.0, 10.0, 10.0);
-    let eye_pos = Vector3::new(0.0, 0.0, 10.0);
+    let amb_light_intensity = Vector3::new(0.0, 10.0, 10.0);
+    // let eye_pos = Vector3::new(0.0, 0.0, 10.0);
+    let eye_pos = Vector3::new(10.0, 0.0, -10.0);
 
     let p = 150.0;
 
@@ -244,19 +282,21 @@ pub fn texture_fragment_shader(payload: &FragmentShaderPayload) -> V3f {
         Some(texture) => texture.get_color_bilinear(payload.tex_coords[0], payload.tex_coords[1]), // Do modification here
     };
     let kd = texture_color / 255.0; // 材质颜色影响漫反射系数
+
+    // let kd = texture_color; // 材质颜色影响漫反射系数
     let ks = Vector3::new(0.7937, 0.7937, 0.7937);
 
     let l1 = Light {
         position: Vector3::new(20.0, 20.0, 20.0),
-        intensity: Vector3::new(500.0, 500.0, 500.0),
+        intensity: Vector3::new(150.0, 150.0, 150.0),
     };
     let l2 = Light {
         position: Vector3::new(-20.0, 20.0, 0.0),
-        intensity: Vector3::new(500.0, 500.0, 500.0),
+        intensity: Vector3::new(150.0, 150.0, 150.0),
     };
     let lights = vec![l1, l2];
-    let amb_light_intensity = Vector3::new(10.0, 10.0, 10.0);
-    let eye_pos = Vector3::new(0.0, 0.0, 10.0);
+    let amb_light_intensity = Vector3::new(1.0, 1.0, 1.0);
+    let eye_pos = Vector3::new(0.0, 0.0, -5.0);
 
     let p = 150.0;
 
@@ -276,19 +316,27 @@ pub fn texture_fragment_shader(payload: &FragmentShaderPayload) -> V3f {
             cor_dot(&kd, &light.intensity) / (r * r) * normal.normalize().dot(&light_hat).max(0.0);
         let h = (light_hat + eye_hat) / (light_hat + eye_hat).norm();
         let Ls = cor_dot(&ks, &light.intensity) / (r * r)
-            * (normal.normalize().dot(&h).max(0.0)).powi(128);
+            * (normal.normalize().dot(&h).max(0.0)).powi(4);
         let La = cor_dot(&ka, &amb_light_intensity);
         result_color += (La + Ls + Ld);
     }
-
+    // result_color[0] *= 1.6;
+    // result_color[1] *= 2.8;
+    // result_color[2] *= 0.3;
+    result_color *= 5.0;
     result_color * 255.0
 }
 
 pub fn bump_fragment_shader(payload: &FragmentShaderPayload) -> V3f {
     let ka = Vector3::new(0.005, 0.005, 0.005);
-    let kd = payload.color;
-    let ks = Vector3::new(0.7937, 0.7937, 0.7937);
-
+    // let ka = Vector3::new(1.000000, 1.000000, 1.000000);
+    //ka 代表了环境光反射系数。环境光反射系数决定了物体表面接受环境光的程度。
+    // let kd = payload.color;
+    let kd = Vector3::new(0.800000, 0.800000, 0.800000);
+    //kd 代表了漫反射系数。漫反射系数决定了物体表面对入射光的漫反射程度。
+    // let ks = Vector3::new(0.7937, 0.7937, 0.7937);
+    let ks = Vector3::new(0.500000, 0.500000, 0.500000);
+    //ks 代表了镜面反射系数。镜面反射系数决定了物体表面对入射光的镜面反射程度。
     let l1 = Light {
         position: Vector3::new(20.0, 20.0, 20.0),
         intensity: Vector3::new(500.0, 500.0, 500.0),
@@ -299,7 +347,8 @@ pub fn bump_fragment_shader(payload: &FragmentShaderPayload) -> V3f {
     };
     let lights = vec![l1, l2];
     let amb_light_intensity = Vector3::new(10.0, 10.0, 10.0);
-    let eye_pos = Vector3::new(0.0, 0.0, 10.0);
+    //意味着场景中的环境光在三个坐标轴方向上的强度都是 10.0 单位。
+    let eye_pos = Vector3::new(0.0, 0.0, -10.0);
 
     let p = 150.0;
 
@@ -308,6 +357,8 @@ pub fn bump_fragment_shader(payload: &FragmentShaderPayload) -> V3f {
     let color = payload.color;
 
     let (kh, kn) = (0.2, 0.1);
+    //kh 代表了高光系数，用于控制物体表面的高光反射强度。
+    //kn 代表了法线贴图系数，用于控制法线贴图对最终显示效果的影响程度。
 
     // LAB3 TODO: Implement bump mapping here
     // Let n = normal = (x, y, z)
@@ -375,7 +426,7 @@ pub fn displacement_fragment_shader(payload: &FragmentShaderPayload) -> V3f {
     };
     let lights = vec![l1, l2];
     let amb_light_intensity = Vector3::new(10.0, 10.0, 10.0);
-    let eye_pos = Vector3::new(0.0, 0.0, 10.0);
+    let eye_pos = Vector3::new(0.0, 0.0, -2.0);
 
     let p = 150.0;
 

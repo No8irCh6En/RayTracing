@@ -1,6 +1,6 @@
 use rand::Rng;
 use std::iter::Sum;
-use std::ops::{Add, AddAssign, Div, Mul, Neg, Sub};
+use std::ops::{Add, AddAssign, Div, Index, IndexMut, Mul, Neg, Sub};
 #[derive(Clone, Debug, PartialEq, Copy)]
 pub struct Vec3 {
     pub x: f64,
@@ -211,6 +211,30 @@ impl Div<f64> for Vec3 {
 impl Sum for Vec3 {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
         iter.fold(Vec3::zero(), |a, b| a + b)
+    }
+}
+
+impl Index<usize> for Vec3 {
+    type Output = f64;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        match index {
+            0 => &self.x,
+            1 => &self.y,
+            2 => &self.z,
+            _ => panic!("Index out of bounds for Vec3"),
+        }
+    }
+}
+
+impl IndexMut<usize> for Vec3 {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        match index {
+            0 => &mut self.x,
+            1 => &mut self.y,
+            2 => &mut self.z,
+            _ => panic!("Index out of bounds for Vec3"),
+        }
     }
 }
 

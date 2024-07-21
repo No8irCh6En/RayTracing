@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::aabb::AABB;
 use crate::interval::Interval;
 use crate::material::Material;
 use crate::ray::Ray;
@@ -11,6 +12,8 @@ pub struct HitRecord {
     pub t: f64,
     pub front_face: bool,
     pub mat_ptr: Option<Arc<dyn Material>>,
+    pub u: f64,
+    pub v: f64,
 }
 
 impl HitRecord {
@@ -27,6 +30,8 @@ impl HitRecord {
             t,
             front_face,
             mat_ptr: mat,
+            u: 0.0,
+            v: 0.0,
         }
     }
 
@@ -42,4 +47,21 @@ impl HitRecord {
 
 pub trait Hittable: Sync {
     fn hit(&self, ray_: &Ray, int: Interval, rec: &mut HitRecord) -> bool;
+    fn bounding_box(&self) -> AABB;
+}
+
+pub struct Translate {
+    object: Arc<dyn Hittable>,
+    offset: Vec3,
+    bbox: AABB,
+}
+
+impl Translate {
+    pub fn new(object: Arc<dyn Hittable>, offset: Vec3) -> Self {
+        Self {
+            object,
+            offset,
+            bbox: object.bounding_box() + offset,
+        }
+    }
 }

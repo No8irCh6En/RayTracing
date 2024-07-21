@@ -190,41 +190,41 @@ impl Rasterizer {
 
                 // MSAA
 
-                let mut fac: f64 = 0.0;
-                let sample_num: i32 = 3;
-                if self.depth_buf[idx] > -depth {
-                    for u in 0..sample_num {
-                        for r in 0..sample_num {
-                            let x_0: f64 = x
-                                + (2.0 * u as f64 - sample_num as f64 + 1.0)
-                                    / (2.0 * sample_num as f64);
-                            let y_0: f64 = y
-                                + (2.0 * r as f64 - sample_num as f64 + 1.0)
-                                    / (2.0 * sample_num as f64);
-                            if inside_triangle(x_0, y_0, &simp_v) {
-                                fac += 1.0 / (sample_num * sample_num) as f64;
-                            }
-                        }
-                    }
-                    if fac > 0.0 {
-                        self.frame_buf[idx] = fac * t.get_color();
-                    }
-                    if inside_triangle(x, y, &simp_v) {
-                        self.depth_buf[idx] = -depth;
-                    }
-                }
+                // let mut fac: f64 = 0.0;
+                // let sample_num: i32 = 3;
+                // if self.depth_buf[idx] > -depth {
+                //     for u in 0..sample_num {
+                //         for r in 0..sample_num {
+                //             let x_0: f64 = x
+                //                 + (2.0 * u as f64 - sample_num as f64 + 1.0)
+                //                     / (2.0 * sample_num as f64);
+                //             let y_0: f64 = y
+                //                 + (2.0 * r as f64 - sample_num as f64 + 1.0)
+                //                     / (2.0 * sample_num as f64);
+                //             if inside_triangle(x_0, y_0, &simp_v) {
+                //                 fac += 1.0 / (sample_num * sample_num) as f64;
+                //             }
+                //         }
+                //     }
+                //     if fac > 0.0 {
+                //         self.frame_buf[idx] = fac * t.get_color();
+                //     }
+                //     if inside_triangle(x, y, &simp_v) {
+                //         self.depth_buf[idx] = -depth;
+                //     }
+                // }
 
                 //TAA
 
-                // let alpha: f64 = 0.05;
-                // if self.depth_buf[idx] > -depth {
-                //     if inside_triangle(x, y, &simp_v) {
-                //         self.depth_buf[idx] = -depth;
-                //         self.frame_buf[idx] =
-                //             alpha * self.pre_frame_sum[idx] + (1.0 - alpha) * t.get_color();
-                //         self.pre_frame_sum[idx] += t.get_color();
-                //     }
-                // }
+                let alpha: f64 = 0.05;
+                if self.depth_buf[idx] > -depth {
+                    if inside_triangle(x, y, &simp_v) {
+                        self.depth_buf[idx] = -depth;
+                        self.frame_buf[idx] =
+                            alpha * self.pre_frame_sum[idx] + (1.0 - alpha) * t.get_color();
+                        self.pre_frame_sum[idx] += t.get_color();
+                    }
+                }
             }
         }
     }

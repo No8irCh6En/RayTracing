@@ -1,6 +1,7 @@
 use crate::color::write_color;
 use crate::hit::{HitRecord, Hittable};
 use crate::interval::Interval;
+use crate::random_f64;
 use crate::ray::Ray;
 use crate::vec3::Vec3;
 use image::RgbImage;
@@ -28,6 +29,7 @@ pub struct Camera {
     pub focus_dist: f64,
     pub defocus_disk_u: Vec3,
     pub defocus_disk_v: Vec3,
+    pub background: Vec3,
 }
 
 impl Camera {
@@ -73,6 +75,7 @@ impl Camera {
             focus_dist: focus_dist,
             defocus_disk_u: defocus_radius * u,
             defocus_disk_v: defocus_radius * v,
+            background: Vec3::default(),
         }
     }
 
@@ -106,29 +109,36 @@ impl Camera {
             self.defocus_disk_sample()
         };
         let ray_dir = pixel_sample - ray_ori;
-        Ray::new(ray_ori, ray_dir)
+        let ray_time = random_f64(0.0, 1.0);
+        Ray::new(ray_ori, ray_dir, ray_time)
     }
 
-    pub fn ray_color<T: Hittable>(ray_: Ray, world: &T, depth: i32) -> Vec3 {
+    pub fn ray_color<T: Hittable>(&self, ray_: Ray, world: &T, depth: i32) -> Vec3 {
         if depth <= 0 {
             return Vec3::new(0.0, 0.0, 0.0);
         }
         let mut rec = HitRecord::new(Vec3::zero(), Vec3::zero(), 0.0, false, None);
-        if world.hit(&ray_, Interval::new(0.001, f64::INFINITY), &mut rec) {
-            let mut scattered = Ray::new(Vec3::zero(), Vec3::zero());
-            let mut attenuation = Vec3::zero();
-            if rec
-                .mat_ptr
-                .as_ref()
-                .unwrap()
-                .scatter(&ray_, &rec, &mut attenuation, &mut scattered)
-            {
-                return attenuation.cor_dot(Self::ray_color(scattered, world, depth - 1));
-            }
-            return Vec3::zero();
+        if !world.hit(&ray_, Interval::new(0.001, f64::INFINITY), &mut rec) {
+            return self.background.clone();
         }
-        let ratio = 0.5 * (1.0 + ray_.dir.normalize().y);
-        (1.0 - ratio) * Vec3::new(1.0, 1.0, 1.0) + ratio * Vec3::new(0.5, 0.7, 1.0)
+        let mut scattered = Ray::new(Vec3::zero(), Vec3::zero(), 0.0);
+        let mut attenuation = Vec3::zero();
+        let color_from_emission = rec
+            .mat_ptr
+            .as_ref()
+            .unwrap()
+            .emitted(rec.u, rec.v, rec.point);
+        if rec
+            .mat_ptr
+            .as_ref()
+            .unwrap()
+            .scatter(&ray_, &rec, &mut attenuation, &mut scattered)
+        {
+            let color_from_scatter =
+                attenuation.cor_dot(self.ray_color(scattered, world, depth - 1));
+            return color_from_emission + color_from_scatter;
+        }
+        color_from_emission
     }
 
     pub fn render<T: Hittable + Sync>(&mut self, world: &T, img: &mut RgbImage) {
@@ -144,7 +154,7 @@ impl Camera {
             for j in 0..self.height {
                 let pixel_color = (0..self.samples_per_pixel)
                     .into_par_iter()
-                    .map(|_| Self::ray_color(self.get_ray(i, j), world, self.max_depth))
+                    .map(|_| self.ray_color(self.get_ray(i, j), world, self.max_depth))
                     .sum::<Vec3>();
                 write_color(pixel_color * pixel_sample_scale, img, i, j);
                 bar.inc(1);

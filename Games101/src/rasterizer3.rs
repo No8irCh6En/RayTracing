@@ -4,7 +4,9 @@ use crate::choose_shader_texture;
 use crate::shader::{FragmentShaderPayload, VertexShaderPayload};
 use crate::texture::Texture;
 use crate::triangle::Triangle;
+use crossbeam::thread;
 use nalgebra::{Matrix4, Vector2, Vector3, Vector4};
+use std::sync::{Arc, Mutex};
 
 #[allow(dead_code)]
 pub enum Buffer {
@@ -107,9 +109,22 @@ impl Rasterizer {
         let mvp = self.projection * self.view * self.model;
 
         // 遍历每个小三角形
+        let mut x = 0;
         for triangle in triangles {
             self.rasterize_triangle(&triangle, mvp);
+            x += 1;
+            if x % 10000 == 0 {
+                println!("{x}");
+            } else if x > 93000 {
+                if x % 1000 == 0 {
+                    println!("{x}");
+                }
+            }
+            // if x > 176000 {
+            //     break;
+            // }
         }
+        println!("Done");
     }
 
     pub fn rasterize_triangle(&mut self, triangle: &Triangle, mvp: Matrix4<f64>) {
@@ -141,6 +156,13 @@ impl Rasterizer {
             .max(new_tri.v[1].y)
             .max(new_tri.v[2].y)
             .min((self.height - 1) as f64) as usize;
+        // const HEIGHT_PARTITION: usize = 40;
+        // const WIDTH_PARTITION: usize = 40;
+
+        // let height_step = (height_max - height_min + 1) / HEIGHT_PARTITION;
+        // let width_step = (width_max - width_min + 1) / WIDTH_PARTITION;
+        // let depth_buf = Arc::new(Mutex::new(&mut self.depth_buf));
+        // let frame_buf = Arc::new(Mutex::new(&mut self.frame_buf));
 
         for i in width_min..=width_max as usize {
             for j in height_min..=height_max as usize {

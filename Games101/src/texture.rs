@@ -34,8 +34,15 @@ impl Texture {
 
     pub fn get_color_bilinear(&self, mut u: f64, mut v: f64) -> Vector3<f64> {
         // 在此实现双线性插值函数, 并替换掉get_color
-        u = u.max(0.0).min(1.0);
-        v = v.max(0.0).min(1.0);
+        // if u < 0.001 && v < 0.001 {
+        //     return Vector3::new(0.0, 0.0, 0.0);
+        // } else {
+        //     return Vector3::new(150.0 / 255.0, 200.0 / 255.0, 50.0 / 255.0);
+        // }
+        // u = u - u.floor();
+        // v = v - v.floor();
+        u = u.max(0.01).min(0.99);
+        v = v.max(0.01).min(0.99);
         let u_img = u * self.width as f64;
         let v_img = (1.0 - v) * self.height as f64;
         let color00: &VecN<u8, 3> = self.img_data.at_2d(v_img as i32, u_img as i32).unwrap();
